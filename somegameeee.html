@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #111;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px;
+            color: white;
+            display: none;
+        }
+        #restartBtn {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            display: none;
+        }
+        #restartBtn:hover {
+            background-color: #666;
+        }
+        #timer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            color: white;
+        }
+        #difficultySelection {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: white;
+        }
+        #difficultySelection button {
+            display: block;
+            margin: 10px;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #444;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #difficultySelection button:hover {
+            background-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameOver">Game Over</div>
+    <button id="restartBtn">Restart</button>
+    <div id="timer">Next enemy in: 30</div>
+    <div id="difficultySelection">
+        <button id="easyBtn">Easy</button>
+        <button id="mediumBtn">Medium</button>
+        <button id="hardBtn">Hard</button>
+        <button id="insaneBtn">Insane</button>
+        <button id="crazyBtn">CRAZY WOoW</button>
+
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 1200;
+        canvas.height = 900;
+
+        const playerSize = 16;
+        const playerSpeed = 5;
+        let playerX, playerY, playerLives;
+        const enemies = [];
+        const enemySize = 16;
+        let enemySpeed;
+        let enemyTimer;
+        let nextEnemyX, nextEnemyY;
+        let gameStarted = false;
+        let enemySpawnRate;
+
+        const items = [];
+        const itemSize = 16;
+        let itemSpawnRate;
+        let itemSpawnTimer;
+
+        function initializeGame() {
+            playerX = canvas.width / 2 - playerSize / 2;
+            playerY = canvas.height / 2 - playerSize / 2;
+            playerLives = 10;
+            enemies.length = 0;
+            items.length = 0;
+            enemyTimer = 30;
+            itemSpawnTimer = 30;
+            nextEnemyX = Math.random() * (canvas.width - enemySize);
+            nextEnemyY = Math.random() * (canvas.height - enemySize);
+            gameStarted = false;
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('restartBtn').style.display = 'none';
+            document.getElementById('difficultySelection').style.display = 'block';
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = 'lime';
+            ctx.fillRect(playerX, playerY, playerSize, playerSize);
+        }
+
+        function drawEnemies() {
+            ctx.fillStyle = 'red';
+            enemies.forEach(enemy => {
+                ctx.fillRect(enemy.x, enemy.y, enemySize, enemySize);
+            });
+        }
+
+        function createEnemy() {
+            const enemy = {
+                x: nextEnemyX,
+                y: nextEnemyY,
+                health: 1,
+            };
+            enemies.push(enemy);
+
+            nextEnemyX = Math.random() * (canvas.width - enemySize);
+            nextEnemyY = Math.random() * (canvas.height - enemySize);
+        }
+
+        function drawNextEnemyMarker() {
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(nextEnemyX + enemySize / 2, nextEnemyY + enemySize / 2, enemySize, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                const dx = playerX - enemy.x;
+                const dy = playerY - enemy.y;
+                const angle = Math.atan2(dy, dx);
+                const speed = enemySpeed;
+
+                enemy.x += Math.cos(angle) * speed;
+                enemy.y += Math.sin(angle) * speed;
+            });
+        }
+
+        let keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function movePlayer() {
+            if (keys['ArrowUp'] || keys['w']) {
+                playerY -= playerSpeed;
+            }
+            if (keys['ArrowDown'] || keys['s']) {
+                playerY += playerSpeed;
+            }
+            if (keys['ArrowLeft'] || keys['a']) {
+                playerX -= playerSpeed;
+            }
+            if (keys['ArrowRight'] || keys['d']) {
+                playerX += playerSpeed;
+            }
+
+            playerX = Math.max(0, Math.min(canvas.width - playerSize, playerX));
+            playerY = Math.max(0, Math.min(canvas.height - playerSize, playerY));
+        }
+
+        function checkCollisions() {
+            enemies.forEach((enemy, index) => {
+                const distance = Math.sqrt(
+                    Math.pow(playerX - enemy.x, 2) + Math.pow(playerY - enemy.y, 2)
+                );
+                if (distance < playerSize) {
+                    playerLives -= 1;
+                    enemies.splice(index, 1);
+                }
+            });
+
+            items.forEach((item, index) => {
+                const distance = Math.sqrt(
+                    Math.pow(playerX - item.x, 2) + Math.pow(playerY - item.y, 2)
+                );
+                if (distance < playerSize) {
+                    playerLives += 2;
+                    items.splice(index, 1);
+                }
+            });
+        }
+
+        function drawLives() {
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText('Lives: ' + playerLives, 10, 30);
+        }
+
+        function updateTimer() {
+            if (enemyTimer > 0) {
+                enemyTimer -= 1;
+            } else {
+                createEnemy();
+                enemyTimer = enemySpawnRate;
+            }
+
+            if (itemSpawnTimer > 0) {
+                itemSpawnTimer -= 1;
+            } else {
+                spawnItem();
+                itemSpawnTimer = itemSpawnRate;
+            }
+
+            document.getElementById('timer').innerText = `Next enemy in: ${enemyTimer}`;
+        }
+
+        function drawItems() {
+            ctx.fillStyle = 'blue';
+            items.forEach(item => {
+                ctx.fillRect(item.x, item.y, itemSize, itemSize);
+            });
+        }
+
+        function spawnItem() {
+            if (Math.random() < 1 / itemSpawnRate) {
+                const item = {
+                    x: Math.random() * (canvas.width - itemSize),
+                    y: Math.random() * (canvas.height - itemSize),
+                };
+                items.push(item);
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            movePlayer();
+            moveEnemies();
+            drawPlayer();
+            drawEnemies();
+            drawItems();
+            drawNextEnemyMarker();
+            drawLives();
+
+            checkCollisions();
+            updateTimer();
+
+            if (playerLives <= 0) {
+                document.getElementById('gameOver').style.display = 'block';
+                document.getElementById('restartBtn').style.display = 'block';
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            initializeGame();
+            document.getElementById('difficultySelection').style.display = 'none';
+            gameStarted = true;
+            gameLoop();
+        }
+
+        document.getElementById('easyBtn').addEventListener('click', () => {
+            enemySpawnRate = 300;
+            enemySpeed = 2;
+            itemSpawnRate = 200;
+            startGame();
+        });
+        document.getElementById('mediumBtn').addEventListener('click', () => {
+            enemySpawnRate = 200;
+            enemySpeed = 2;
+            itemSpawnRate = 150;
+            startGame();
+        });
+        document.getElementById('hardBtn').addEventListener('click', () => {
+            enemySpawnRate = 100;
+            enemySpeed = 2;
+            itemSpawnRate = 100;
+            startGame();
+        });
+        document.getElementById('insaneBtn').addEventListener('click', () => {
+            enemySpawnRate = 30;
+            enemySpeed = playerSpeed;
+            itemSpawnRate = 50;
+            startGame();
+        });
+        document.getElementById('crazyBtn').addEventListener('click', () => {
+    window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank'); // Замените URL на нужный
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            initializeGame();
+            document.getElementById('difficultySelection').style.display = 'block';
+            document.getElementById('restartBtn').style.display = 'none';
+        });
+    </script>
+</body>
+</html>
